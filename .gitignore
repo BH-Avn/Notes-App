@@ -1,0 +1,4 @@
+*.class
+
+# captured thoughts and sorted notes are user data, not source
+vault/
