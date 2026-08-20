@@ -1,26 +1,41 @@
 # QuickCap
 
-A place to dump thoughts instantly, sort them slowly, and never lose them.
+A CLI tool for dumping thoughts instantly, sorting them slowly, and never losing them. Captured thoughts are stored as plain `.md` files — no database, no proprietary format.
 
-## The problem
+## What it's for
 
-Most note apps ask questions before they let you write. Which notebook? What title? Which folder? Which tag?
+QuickCap splits note-taking into two separate steps: **capture**, which is instant and asks nothing (no title, no folder, no tags), and **sort**, a deliberate later pass where you decide what each thought is worth and where it belongs. It's meant for the moment a thought needs to get out of your head *right now*, without a form to fill in first.
 
-Every question is a reason not to open the app. The thought was three seconds long and the app wants twenty. So the thought is lost.
+## Features
 
-Sorting is the useful part — but it belongs later, when you have time, not in the moment you're trying to get something out of your head.
+- [x] **Capture** — write a thought, it's saved as its own timestamped `.md` file in the inbox.
+- [x] **List** — view every thought currently in the inbox, indexed and in chronological order.
+- [ ] **Query language** — sort thoughts out of the inbox in batches by text match, index, or date range (`move`, `kill`, `list`, combined with `and` / `or` / `not`).
+- [ ] **Trash** — killed thoughts are moved to `.trash`, not deleted.
 
-## The idea
+## Project structure
 
-Split capture and organisation completely.
+```
+code/
+  Thought.java   a single captured thought — text, timestamp, and its formatted heading/filename
+  Inbox.java     the unsorted pile — writes new thoughts, lists what's captured
+vault/
+  inbox/         where captured thoughts land (not tracked in git — it's user data)
+```
 
-**Capture is instant.** One command, type, Enter, done. No folder, no title, no tags. Everything lands in one pile.
+## Requirements
 
-**Sorting is deliberate.** Later, when you have time, you work through the pile. Keep it, move it into an existing note, or throw it away.
+- JDK 17+
 
-That sorting step is the thinking. The app doesn't do it for you and shouldn't. Deciding a thought was worth keeping — and where it belongs — is the part that makes it yours.
+## Building & running
 
-## How it works
+There's no `main` entry point yet — `Thought` and `Inbox` are the underlying pieces, not a runnable CLI. Until that lands, compile and use them directly:
+
+```
+javac -d out code/*.java
+```
+
+## How it will work
 
 ### Capture
 
@@ -40,11 +55,11 @@ move "calc" and not "doubt" -> study
 
 Nothing is destroyed. Killed thoughts go to `.trash`.
 
-## Design rules
+## Design principles
 
 - **Plain text, plain folders.** A vault is `.md` files in directories. No database, no proprietary format. Readable in Notepad, works in Obsidian unchanged, survives this program being abandoned.
-- **One thought, one file.** Removal is the operation that decides the design, not capture. Moving a file always succeeds or doesn't; rewriting a shared file can fail halfway. It also means content and structure never touch, so there's no delimiter to escape — your thought can contain anything.
-- **Never lose a thought.** Write, verify, then remove. Never the reverse. A tool that eats one thought is never trusted again.
+- **One thought, one file.** Moving a file always succeeds or doesn't; rewriting a shared file can fail halfway. It also means content and structure never touch, so there's no delimiter to escape — a thought can contain anything.
+- **Never lose a thought.** Write, verify, then remove. Never the reverse.
 - **Speed over structure at capture time.** Every prompt the program asks is a reason not to use it. Titles are generated, not requested.
 
 ## Roadmap
@@ -53,8 +68,6 @@ Nothing is destroyed. Killed thoughts go to `.trash`.
 - **v2** — the query language
 - **later** — separating events (what happened, dated, never edited) from conclusions (what you now believe, which can change, and which points back to the events that caused it), so a belief can always be traced to its cause
 
-## Why it exists
+## License
 
-Written to learn Java properly — file I/O, immutability, class design, and a recursive descent parser for the query language.
-
-The only real test: am I still using it six weeks in, on a day I'm busy and irritated. If yes, it works. If no, nothing else matters.
+None yet — all rights reserved by default until one is added.
