@@ -1,12 +1,16 @@
+package base;
+
+import static helper.Utils.*;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
 /**
- * Represents a single note/thought entry, capturing its text content
- * and the timestamp it was created. Provides formatted strings for
- * display (heading) and for use as a file name.
+ * Represents a single note/thought entry, capturing its text content and the
+ * timestamp it was created. Provides formatted strings for display (heading)
+ * and for use as a file name.
  */
-class Thought {
+class Thought
+{
 
     /** The text content of the thought. */
     private final String text;
@@ -21,34 +25,37 @@ class Thought {
     private static final DateTimeFormatter formatFileName = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
     /**
-     * Creates a new Thought with the given text, timestamped at the
-     * moment of creation.
+     * Creates a new Thought with the given text, timestamped at the moment of
+     * creation.
      *
      * @param text the content of the thought
      */
-    Thought(String text) {
+    Thought(String text)
+    {
         this.text = text;
         created = LocalDateTime.now();
     }
 
     /**
-     * Returns a human-readable heading for this thought based on its
-     * creation timestamp.
+     * Returns a human-readable heading for this thought based on its creation
+     * timestamp.
      *
      * @return the formatted heading string
      */
-    public String heading() {
+    public String heading()
+    {
 
         return created.format(formatHeading);
     }
 
     /**
-     * Returns a file name for this thought based on its creation
-     * timestamp, suitable for saving as a Markdown file.
+     * Returns a file name for this thought based on its creation timestamp,
+     * suitable for saving as a Markdown file.
      *
      * @return the generated file name, ending in ".md"
      */
-    public String fileName() {
+    public String fileName()
+    {
 
         return created.format(formatFileName) + ".md";
     }
@@ -58,9 +65,9 @@ class Thought {
      *
      * @return the thought's text
      */
-    public String text() {
+    public String text()
+    {
         return text;
     }
 
-    
 }
