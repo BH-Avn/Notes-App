@@ -5,35 +5,121 @@ import java.io.IOException;
 import java.nio.file.*;
 import java.util.*;
 import java.util.stream.Stream;
+import static base.Thought.*;
 
 /**
- * Represents the inbox: the single unsorted pile of captured thoughts. Each
- * thought is written as its own timestamped .md file directly inside the inbox
- * directory.
+ * The inbox: the single unsorted pile of captured thoughts, held in memory and
+ * mirrored on disk as one .md file per thought.
+ *
+ * <p>
+ * This is the only class that touches the filesystem. Everything above it works
+ * with {@link Thought} objects and never opens a file; {@code Thought} itself
+ * decides the file format but never performs I/O.
+ *
+ * <p>
+ * The full pile is read into memory once at construction and kept there.
+ * {@link #list()} therefore renders from objects rather than re-reading the
+ * directory, and every mutation must update both the list and the disk to keep
+ * them in step.
  */
 class Inbox
 {
-    /** The inbox directory on disk. */
+    /** The inbox directory on disk. Created on demand if missing. */
     private final Path path;
 
     /**
-     * Creates an Inbox rooted at the given directory. The directory is not required
-     * to exist yet — it is created on demand.
+     * Every thought currently in the inbox, oldest first. A thought's position
+     * here is its display index — the index is deliberately not stored on the
+     * Thought itself, so removals renumber automatically.
+     */
+    private ArrayList<Thought> thoughts = new ArrayList<>();
+
+    /**
+     * Creates an Inbox rooted at the given directory and immediately loads
+     * whatever is already there.
      *
      * @param path the inbox directory
      */
     Inbox(Path path)
     {
         this.path = path;
+        safeLoad();
     }
 
     /**
-     * Captures a new thought: writes its text to its own timestamped .md file
-     * inside the inbox, creating the inbox directory first if needed.
+     * Loads the inbox, treating failure as fatal.
+     *
+     * <p>
+     * A constructor cannot propagate a checked exception without forcing every
+     * caller to handle it, and an inbox that could not be read is not usable —
+     * continuing would show the user an empty pile and risk writing over
+     * thoughts that were simply never loaded. So this exits instead.
+     */
+    private void safeLoad()
+    {
+        try
+        {
+            load();
+        }
+        catch (IOException e)
+        {
+            pl("Error Loading the folder ! , this is a CRASH !!!!");
+            System.exit(1);
+        }
+    }
+
+    /**
+     * Reads every thought file in the inbox directory into memory.
+     *
+     * <p>
+     * Files that are not thoughts are skipped rather than treated as errors, so
+     * a stray README or editor backup in the folder cannot stop the program
+     * from starting.
+     *
+     * @throws IOException if the directory cannot be created or read
+     */
+    private void load() throws IOException
+    {
+        Files.createDirectories(path);
+
+        try (Stream<Path> entries = Files.list(path))
+        {
+            // Filenames are yyyyMMdd-HHmmss.md, a fixed-width format, so sorting
+            // them alphabetically also sorts them chronologically.
+            List<Path> allFiles = entries.sorted().toList();
+
+            for (Path p : allFiles)
+            {
+                String fileName = p.getFileName().toString();
+
+                if (isThoughtFile(fileName))
+                {
+
+                    String content = Files.readString(p);
+
+                    Thought thought = loadedThought(fileName, content);
+
+                    thoughts.add(thought);
+
+                }
+            }
+        }
+    }
+
+    /**
+     * Captures a new thought: writes it to its own file and adds it to the
+     * in-memory pile.
+     *
+     * <p>
+     * The write uses CREATE_NEW so an existing file is never overwritten. If two
+     * thoughts land in the same second their filenames collide, and this fails
+     * loudly with an exception rather than silently destroying the earlier one.
+     * The in-memory list is only updated after the write succeeds, so a failed
+     * capture cannot leave a thought in memory that is not on disk.
      *
      * @param text the content of the thought
-     * @return the path of the file the thought was written to
-     * @throws IOException if the inbox directory or file cannot be created/written
+     * @return the path the thought was written to
+     * @throws IOException if the file cannot be created or written
      */
     public Path add(String text) throws IOException
     {
@@ -43,43 +129,36 @@ class Inbox
 
         Path thoughtPath = path.resolve(thought.fileName());
 
-        Files.writeString(thoughtPath, "## " + thought.heading() + "\n" + thought.text());
+        String thoughtFileContent = thought.toFileContent();
+
+        Files.writeString(thoughtPath, thoughtFileContent, StandardOpenOption.CREATE_NEW);
+
+        thoughts.add(thought);
 
         return thoughtPath;
+
     }
 
     /**
-     * Lists every thought currently sitting in the inbox, oldest first, each
-     * prefixed with a 1-based index for use by later commands (e.g. move/kill by
-     * index).
+     * Renders the whole inbox for display, oldest first, each entry numbered
+     * from 1 for use by later commands (move/kill by index).
      *
-     * @return the formatted contents of the inbox, or a message if it is empty
-     * @throws IOException if the inbox directory cannot be read
+     * <p>
+     * Built entirely from the in-memory list — no disk access. The heading shown
+     * here is generated at display time and is not part of any file.
+     *
+     * @return the formatted listing, or an empty string if the inbox is empty
      */
-    public String list() throws IOException
+    public String list()
     {
         StringBuilder s1 = new StringBuilder();
 
-        Files.createDirectories(path);
-
-        try (Stream<Path> entries = Files.list(path))
+        int index = 0;
+        for (Thought t : thoughts)
         {
-            // Sorted since filenames are yyyyMMdd-HHmmss.md, so alphabetical order is
-            // chronological order.
-            List<Path> allFiles = entries.sorted().toList();
-
-            int index = 0;
-            for (Path p : allFiles)
-            {
-                if (p.getFileName().toString().endsWith(".md"))
-                {
-                    s1.append(++index + ":" + "\n").append(Files.readString(p)).append("\n----------------\n");
-                }
-            }
+            s1.append(++index + ":\n").append("# " + t.createdDateTime() + "\n").append(t.toFileContent() + "\n");
         }
 
-        if (s1.isEmpty())
-            return "";
         return s1.toString();
     }
 }
