@@ -9,6 +9,7 @@ QuickCap splits note-taking into two separate steps: **capture**, which is insta
 ## Features
 
 - [x] **Capture** — write a thought, it's saved as its own timestamped `.md` file in the inbox.
+- [x] **Load** — existing thoughts are read back off disk into memory at startup, so the inbox survives restarts as real objects, not just files.
 - [x] **List** — view every thought currently in the inbox, indexed and in chronological order.
 - [ ] **Query language** — sort thoughts out of the inbox in batches by text match, index, or date range (`move`, `kill`, `list`, combined with `and` / `or` / `not`).
 - [ ] **Trash** — killed thoughts are moved to `.trash`, not deleted.
@@ -18,14 +19,33 @@ QuickCap splits note-taking into two separate steps: **capture**, which is insta
 ```
 code/
   base/
-    Thought.java   a single captured thought — text, timestamp, and its formatted heading/filename
-    Inbox.java     the unsorted pile — writes new thoughts, lists what's captured
+    Thought.java   a single captured thought — owns the file format in both directions
+    Inbox.java     the unsorted pile — the only class that touches disk
     Main.java      the CLI menu — capture, list, exit
   helper/
     Utils.java     shared console I/O helpers (p, pl, inpint, inpdob)
 vault/
   inbox/         where captured thoughts land (not tracked in git — it's user data)
 ```
+
+## File format
+
+A thought file is named for the moment it was captured, and contains nothing but the text:
+
+```
+vault/inbox/20260821-210925.md
+```
+```
+the actual thought, verbatim
+```
+
+The timestamp lives in the **filename only** — it is the thought's identity. Nothing is stored inside the file except what the user typed, which means there is no header to strip, no front matter, and no delimiter to escape. A thought can begin with `##`, contain blank lines, or hold anything at all without confusing the reader.
+
+`Thought` owns this format in both directions: it builds the filename and body when writing, and parses them back when loading. Nothing else in the codebase knows the timestamp pattern or the file extension, so the format can be changed in one place.
+
+Because the filename format is fixed-width, sorting filenames alphabetically also sorts them chronologically — the listing gets its order for free.
+
+**Known limitation:** the timestamp is precise to the second, so two thoughts captured within the same second would want the same filename. Files are written with `CREATE_NEW`, so this fails loudly instead of silently overwriting the earlier thought — but it is not yet handled gracefully. See the roadmap.
 
 ## Requirements
 
@@ -64,12 +84,16 @@ Nothing is destroyed. Killed thoughts go to `.trash`.
 
 - **Plain text, plain folders.** A vault is `.md` files in directories. No database, no proprietary format. Readable in Notepad, works in Obsidian unchanged, survives this program being abandoned.
 - **One thought, one file.** Moving a file always succeeds or doesn't; rewriting a shared file can fail halfway. It also means content and structure never touch, so there's no delimiter to escape — a thought can contain anything.
-- **Never lose a thought.** Write, verify, then remove. Never the reverse.
+- **Metadata goes in the filename, never in the file.** The file body is the user's text and nothing else. Anything the program needs to know about a thought is encoded in its name, so no thought can ever be mistaken for a header.
+- **One owner per format.** Whatever writes a format also parses it, and the two live side by side. A writer and a reader in different classes are invisible to the compiler and drift apart silently.
+- **Never lose a thought.** Write, verify, then remove. Never the reverse. Nothing overwrites an existing file.
+- **Only one class touches disk.** `Inbox` performs all I/O. `Thought` decides what the bytes look like but never writes them.
 - **Speed over structure at capture time.** Every prompt the program asks is a reason not to use it. Titles are generated, not requested.
 
 ## Roadmap
 
-- **v1** — capture
+- **v1** — capture, load, list
+- **next** — same-second filename collisions handled rather than merely refused; unreadable files reported instead of silently skipped; verify-after-write
 - **v2** — the query language
 - **later** — separating events (what happened, dated, never edited) from conclusions (what you now believe, which can change, and which points back to the events that caused it), so a belief can always be traced to its cause
 
