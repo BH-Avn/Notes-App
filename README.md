@@ -17,8 +17,12 @@ QuickCap splits note-taking into two separate steps: **capture**, which is insta
 
 ```
 code/
-  Thought.java   a single captured thought — text, timestamp, and its formatted heading/filename
-  Inbox.java     the unsorted pile — writes new thoughts, lists what's captured
+  base/
+    Thought.java   a single captured thought — text, timestamp, and its formatted heading/filename
+    Inbox.java     the unsorted pile — writes new thoughts, lists what's captured
+    Main.java      the CLI menu — capture, list, exit
+  helper/
+    Utils.java     shared console I/O helpers (p, pl, inpint, inpdob)
 vault/
   inbox/         where captured thoughts land (not tracked in git — it's user data)
 ```
@@ -29,17 +33,18 @@ vault/
 
 ## Building & running
 
-There's no `main` entry point yet — `Thought` and `Inbox` are the underlying pieces, not a runnable CLI. Until that lands, compile and use them directly:
+```
+javac -d out code/base/*.java code/helper/*.java
+java -cp out base.Main
+```
 
-```
-javac -d out code/*.java
-```
+This launches a menu-driven CLI: capture a thought, list everything in the inbox, or exit.
 
 ## How it will work
 
 ### Capture
 
-Run it, type, Enter. The thought is saved as its own file, timestamped, in the inbox. Keep typing to dump more. Empty line exits.
+Run it, choose "Enter a Thought", type, Enter. The thought is saved as its own file, timestamped, in the inbox. Back at the menu, capture again or list what's piled up.
 
 ### Sort
 
