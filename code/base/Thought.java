@@ -18,7 +18,19 @@ class Thought
 
     private final String text;
 
+    /**
+     * The one place the extension is written down. Both the name builder and the
+     * name checker read it, so changing it here changes both at once.
+     */
     private static final String extension = ".md";
+
+    /**
+     * Divides the timestamp from the counter in a filename. Distinct from the
+     * dashes inside the timestamp pattern itself, which belong to the date
+     * format and are not this constant's business. Cutting at the *last*
+     * occurrence is what keeps the two apart.
+     */
+    private static final String separator = "-";
 
     private final LocalDateTime created;
 
@@ -28,6 +40,7 @@ class Thought
     /** Fixed-width, so sorting filenames as text sorts them by time. */
     private static final DateTimeFormatter formatFileName = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
+    /** A brand new thought: stamped with the current time. */
     Thought(String text)
     {
         this.text = text;
@@ -48,7 +61,7 @@ class Thought
     public static Thought loadedThought(String fileName, String content)
     {
 
-        fileName = fileName.substring(0,fileName.lastIndexOf("-"));;
+        fileName = fileName.substring(0,fileName.lastIndexOf(separator));
         LocalDateTime loadedDateTime = LocalDateTime.parse(fileName, formatFileName);
         Thought thought = new Thought(content, loadedDateTime);
         return thought;
@@ -63,7 +76,7 @@ class Thought
     public String fileName(int n)
     {
 
-        return created.format(formatFileName) + "-" + String.format("%02d", n) + extension;
+        return created.format(formatFileName) + separator + String.format("%02d", n) + extension;
     }
 
     /** The user's text and nothing else. */
@@ -72,6 +85,10 @@ class Thought
         return this.text;
     }
 
+    /**
+     * Human-readable timestamp for the listing. Display only — this string is
+     * never written to disk and never parsed back.
+     */
     public String createdDateTime()
     {
         return created.format(formatHeading);
@@ -83,13 +100,13 @@ class Thought
      */
     public static boolean isThoughtFile(String fileName)
     {
-        if (!fileName.endsWith(extension) || !(fileName.lastIndexOf("-")>-1))
+        if (!fileName.endsWith(extension) || fileName.lastIndexOf(separator)==-1)
             return false;
 
         try
         {
 
-            fileName = fileName.substring(0, fileName.lastIndexOf("-"));
+            fileName = fileName.substring(0, fileName.lastIndexOf(separator));
             LocalDateTime.parse(fileName, formatFileName);
             return true;
         }
