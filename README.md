@@ -11,6 +11,7 @@ QuickCap splits note-taking into two separate steps: **capture**, which is insta
 - [x] **Capture** — write a thought, it's saved as its own timestamped `.md` file in the inbox.
 - [x] **Load** — existing thoughts are read back off disk into memory at startup, so the inbox survives restarts as real objects, not just files.
 - [x] **List** — view every thought currently in the inbox, indexed and in chronological order.
+- [x] **Collision-safe capture** — thoughts captured in the same second get distinct filenames; none is ever overwritten.
 - [ ] **Query language** — sort thoughts out of the inbox in batches by text match, index, or date range (`move`, `kill`, `list`, combined with `and` / `or` / `not`).
 - [ ] **Trash** — killed thoughts are moved to `.trash`, not deleted.
 
@@ -33,7 +34,7 @@ vault/
 A thought file is named for the moment it was captured, and contains nothing but the text:
 
 ```
-vault/inbox/20260821-210925.md
+vault/inbox/20260821-210925-01.md
 ```
 ```
 the actual thought, verbatim
@@ -45,7 +46,7 @@ The timestamp lives in the **filename only** — it is the thought's identity. N
 
 Because the filename format is fixed-width, sorting filenames alphabetically also sorts them chronologically — the listing gets its order for free.
 
-**Known limitation:** the timestamp is precise to the second, so two thoughts captured within the same second would want the same filename. Files are written with `CREATE_NEW`, so this fails loudly instead of silently overwriting the earlier thought — but it is not yet handled gracefully. See the roadmap.
+The timestamp is only precise to the second, so the filename ends with a counter: `-01`, `-02`, and so on. It carries no meaning — it exists only to make the name unique when two thoughts land in the same second. Files are written with `CREATE_NEW`, so the filesystem itself decides whether a name is taken: on a collision the counter is bumped and the write retried, rather than checking first and racing. The counter is zero-padded so names still sort as text, which caps it at 99 captures in one second; past that the capture refuses rather than quietly breaking the ordering.
 
 ## Requirements
 
@@ -93,7 +94,7 @@ Nothing is destroyed. Killed thoughts go to `.trash`.
 ## Roadmap
 
 - **v1** — capture, load, list
-- **next** — same-second filename collisions handled rather than merely refused; unreadable files reported instead of silently skipped; verify-after-write
+- **next** — unreadable files reported instead of silently skipped; explicit UTF-8 on every read and write; verify-after-write on move
 - **v2** — the query language
 - **later** — separating events (what happened, dated, never edited) from conclusions (what you now believe, which can change, and which points back to the events that caused it), so a belief can always be traced to its cause
 
