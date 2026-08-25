@@ -8,38 +8,23 @@ import java.util.stream.Stream;
 import static base.Thought.*;
 
 /**
- * The inbox: the single unsorted pile of captured thoughts, held in memory and
- * mirrored on disk as one .md file per thought.
+ * The unsorted pile: held in memory, mirrored on disk as one .md file per
+ * thought.
  *
- * <p>
- * This is the only class that touches the filesystem. Everything above it works
- * with {@link Thought} objects and never opens a file; {@code Thought} itself
- * decides the file format but never performs I/O.
- *
- * <p>
- * The full pile is read into memory once at construction and kept there.
- * {@link #list()} therefore renders from objects rather than re-reading the
- * directory, and every mutation must update both the list and the disk to keep
- * them in step.
+ * Only class that touches the filesystem. Thought decides the format but never
+ * performs I/O. The pile is read into memory once at construction, so every
+ * mutation must update both the list and the disk to keep them in step.
  */
 class Inbox
 {
-    /** The inbox directory on disk. Created on demand if missing. */
     private final Path path;
 
     /**
-     * Every thought currently in the inbox, oldest first. A thought's position
-     * here is its display index — the index is deliberately not stored on the
-     * Thought itself, so removals renumber automatically.
+     * Oldest first. A thought's position here is its display index — the index
+     * is deliberately not stored on the Thought, so removals renumber free.
      */
     private ArrayList<Thought> thoughts = new ArrayList<>();
 
-    /**
-     * Creates an Inbox rooted at the given directory and immediately loads
-     * whatever is already there.
-     *
-     * @param path the inbox directory
-     */
     Inbox(Path path)
     {
         this.path = path;
@@ -47,13 +32,10 @@ class Inbox
     }
 
     /**
-     * Loads the inbox, treating failure as fatal.
-     *
-     * <p>
      * A constructor cannot propagate a checked exception without forcing every
-     * caller to handle it, and an inbox that could not be read is not usable —
-     * continuing would show the user an empty pile and risk writing over
-     * thoughts that were simply never loaded. So this exits instead.
+     * caller to handle it, and an inbox that failed to load is not usable —
+     * continuing would show an empty pile and risk writing over thoughts that
+     * were simply never read. So this exits instead.
      */
     private void safeLoad()
     {
@@ -69,14 +51,8 @@ class Inbox
     }
 
     /**
-     * Reads every thought file in the inbox directory into memory.
-     *
-     * <p>
-     * Files that are not thoughts are skipped rather than treated as errors, so
-     * a stray README or editor backup in the folder cannot stop the program
-     * from starting.
-     *
-     * @throws IOException if the directory cannot be created or read
+     * Non-thought files are skipped, not treated as errors, so a stray file in
+     * the folder cannot stop the program from starting.
      */
     private void load() throws IOException
     {
@@ -84,8 +60,7 @@ class Inbox
 
         try (Stream<Path> entries = Files.list(path))
         {
-            // Filenames are yyyyMMdd-HHmmss.md, a fixed-width format, so sorting
-            // them alphabetically also sorts them chronologically.
+            // Fixed-width filenames, so alphabetical order is chronological order.
             List<Path> allFiles = entries.sorted().toList();
 
             for (Path p : allFiles)
@@ -107,47 +82,61 @@ class Inbox
     }
 
     /**
-     * Captures a new thought: writes it to its own file and adds it to the
-     * in-memory pile.
+     * Writes the thought to its own file, then adds it to the pile.
      *
-     * <p>
-     * The write uses CREATE_NEW so an existing file is never overwritten. If two
-     * thoughts land in the same second their filenames collide, and this fails
-     * loudly with an exception rather than silently destroying the earlier one.
-     * The in-memory list is only updated after the write succeeds, so a failed
-     * capture cannot leave a thought in memory that is not on disk.
+     * CREATE_NEW means the filesystem, not a prior check, decides whether the
+     * name is taken. A collision is expected, so it is handled here by bumping
+     * the counter and retrying. Any other IO failure is not expected and is
+     * left to escape.
      *
-     * @param text the content of the thought
-     * @return the path the thought was written to
-     * @throws IOException if the file cannot be created or written
+     * The list is updated only after the write succeeds, so a failed capture
+     * cannot leave memory ahead of disk.
      */
     public Path add(String text) throws IOException
     {
-        Files.createDirectories(path);
+        
 
         Thought thought = new Thought(text);
+        Path thoughtPath;
 
-        Path thoughtPath = path.resolve(thought.fileName());
+        int counter = 1;
 
-        String thoughtFileContent = thought.toFileContent();
+        while (true)
+        {
+            if(counter>99)
+               throw new IllegalStateException("More than 99 entries in a second!");
+            
+            
+            try
+            {
 
-        Files.writeString(thoughtPath, thoughtFileContent, StandardOpenOption.CREATE_NEW);
+                thoughtPath = path.resolve(thought.fileName(counter));
 
-        thoughts.add(thought);
+                String thoughtFileContent = thought.toFileContent();
 
-        return thoughtPath;
+                Files.writeString(thoughtPath, thoughtFileContent, StandardOpenOption.CREATE_NEW);
+
+                thoughts.add(thought);
+
+                
+
+                return thoughtPath;
+            }
+            catch (FileAlreadyExistsException e)
+            {
+                counter++;
+
+            }
+
+            
+        }
 
     }
 
     /**
-     * Renders the whole inbox for display, oldest first, each entry numbered
-     * from 1 for use by later commands (move/kill by index).
-     *
-     * <p>
-     * Built entirely from the in-memory list — no disk access. The heading shown
-     * here is generated at display time and is not part of any file.
-     *
-     * @return the formatted listing, or an empty string if the inbox is empty
+     * Numbered from 1 for later commands (move/kill by index). Built from
+     * memory, no disk access. The heading is generated at display time and is
+     * not part of any file.
      */
     public String list()
     {
